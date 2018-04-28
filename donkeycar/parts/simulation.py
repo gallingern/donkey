@@ -47,13 +47,13 @@ class SteeringServer(object):
     Prebuilt simulators available:
     Windows: https://drive.google.com/file/d/0BxSsaxmEV-5YRC1ZWHZ4Y1dZTkE/view?usp=sharing
     '''
-    def __init__(self, _sio, kpart, top_speed=4.0, image_part=None, steering_scale=1.0):
+    def __init__(self, _sio, donkey_car_model, top_speed=4.0, image_part=None, steering_scale=1.0):
         self.model = None
         self.timer = FPSTimer()
         self.sio = _sio
         # TODO: convert this flask app to a tornado app to minimize dependencies.
         self.app = Flask(__name__)
-        self.kpart = kpart
+        self.donkey_car_model = donkey_car_model
         self.image_part = image_part
         self.steering_scale = steering_scale
         self.top_speed = top_speed
@@ -98,7 +98,7 @@ class SteeringServer(object):
                 image_array = self.image_part.run(image_array)
 
             # forward pass - inference
-            steering, throttle = self.kpart.run(image_array)
+            steering, throttle = self.donkey_car_model.run(image_array)
 
             # filter throttle here, as our NN doesn't always do a greate job
             throttle = self.throttle_control(last_steering, last_throttle, speed, throttle)

@@ -9,6 +9,10 @@ import donkeycar as dk
 from donkeycar.parts.datastore import Tub
 from .tub import TubManager
 
+from keras import backend as keras_backend
+from donkeycar.parts.tflite_model import TfLiteCategorical, convert_keras_to_tflite
+
+
 
 PACKAGE_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 TEMPLATES_PATH = os.path.join(PACKAGE_PATH, 'templates')
@@ -221,9 +225,6 @@ class MakeMovie(BaseCommand):
         return image # returns a 8-bit RGB array
 
 
-
-
-
 class Sim(BaseCommand):
     '''
     Start a websocket SocketIO server to talk to a donkey simulator    
@@ -253,6 +254,7 @@ class Sim(BaseCommand):
         if cfg is None:
             return
 
+        keras_backend.set_learning_phase(0)
         #TODO: this logic should be in a pilot or modle handler part.
         if args.type == "categorical":
             kl = KerasCategorical()
@@ -266,7 +268,14 @@ class Sim(BaseCommand):
         img_stack = None
 
         #load keras model
-        kl.load(args.model)  
+        kl.load(args.model)
+
+        #load tflite model
+        lite_filename = convert_keras_to_tflite(kl, args.model)
+        donkey_lite = TfLiteCategorical(lite_filename, kl, testing=True)
+
+        #reload keras model
+        kl.load(args.model)
 
         #start socket server framework
         sio = socketio.Server()
@@ -274,8 +283,10 @@ class Sim(BaseCommand):
         top_speed = float(args.top_speed)
 
         #start sim server handler
-        ss = SteeringServer(sio, kpart=kl, top_speed=top_speed, image_part=img_stack)
-                
+        # ss = SteeringServer(sio, donkey_car_model=kl, top_speed=top_speed, image_part=img_stack)
+        ss = SteeringServer(sio, donkey_car_model=donkey_lite,
+                           top_speed=top_speed, image_part=img_stack)
+
         #register events and pass to server handlers
 
         @sio.on('telemetry')

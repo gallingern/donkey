@@ -26,6 +26,8 @@ from donkeycar.parts.controller import LocalWebController, JoystickController
 from donkeycar.parts.time import Timestamp
 
 from donkeycar.parts.autorope import AutoropeSession
+from keras import backend as keras_backend
+from donkeycar.parts.tflite_model import TfLiteCategorical, convert_keras_to_tflite
 
 
 def drive(cfg, model_path=None, use_joystick=False):
@@ -72,12 +74,20 @@ def drive(cfg, model_path=None, use_joystick=False):
     pilot_condition_part = Lambda(pilot_condition)
     V.add(pilot_condition_part, inputs=['user/mode'], outputs=['run_pilot'])
     
-    # Run the pilot if the mode is not user.
+    keras_backend.set_learning_phase(0)
+    #Run the pilot if the mode is not user.
     kl = KerasCategorical()
-    if model_path:
-        kl.load(model_path)
-    
-    V.add(kl, inputs=['cam/image_array'], 
+    kl.load(model_path)
+
+    #Load TFLite model.
+    lite_filename = convert_keras_to_tflite(kl, model_path)
+    donkey_lite = TfLiteCategorical(lite_filename, kl, testing=True)
+
+    #Reload Keras model.
+    #kl.load(args.model)
+
+    #V.add(kl, inputs=['cam/image_array'],
+    V.add(donkey_lite, inputs=['cam/image_array'],
           outputs=['pilot/angle', 'pilot/throttle'],
           run_condition='run_pilot')
     
