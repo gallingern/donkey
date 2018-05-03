@@ -82,7 +82,7 @@ def drive(cfg, model_path=None, lite_model_path=None, use_joystick=False):
         kl.load(model_path)
 
         #Load TFLite model.
-        donkey_lite = TfLiteCategorical(lite_model, kl, testing=True)
+        donkey_lite = TfLiteCategorical(lite_model_path, kl, testing=True)
 
     #V.add(kl, inputs=['cam/image_array'],
     V.add(donkey_lite, inputs=['cam/image_array'],
