@@ -3,8 +3,9 @@
 Scripts to drive a donkey 2 car and train a model for it. 
 
 Usage:
-    manage.py (drive) [--model=<model>] [--js]
+    manage.py (drive) [--model=<keras model>] [--lite_model=<tflite model>] [--js]
     manage.py (train) [--tub=<tub1,tub2,..tubn>]  (--model=<model>) [--no_cache]
+    manage.py (convert) [--keras_model=<keras model>]
 
 Options:
     -h --help        Show this screen.
@@ -26,11 +27,11 @@ from donkeycar.parts.controller import LocalWebController, JoystickController
 from donkeycar.parts.time import Timestamp
 
 from donkeycar.parts.autorope import AutoropeSession
-from keras import backend as keras_backend
 from donkeycar.parts.tflite_model import TfLiteCategorical, convert_keras_to_tflite
+from tensorflow.python.keras import backend as keras_backend
 
 
-def drive(cfg, model_path=None, use_joystick=False):
+def drive(cfg, model_path=None, lite_model_path=None, use_joystick=False):
     """
     Construct a working robotic vehicle from many parts.
     Each part runs as a job in the Vehicle loop, calling either
@@ -74,17 +75,14 @@ def drive(cfg, model_path=None, use_joystick=False):
     pilot_condition_part = Lambda(pilot_condition)
     V.add(pilot_condition_part, inputs=['user/mode'], outputs=['run_pilot'])
     
-    keras_backend.set_learning_phase(0)
-    #Run the pilot if the mode is not user.
+    #Load Keras model.
     kl = KerasCategorical()
-    kl.load(model_path)
+    donkey_lite = None
+    if model_path:
+        kl.load(model_path)
 
-    #Load TFLite model.
-    lite_filename = convert_keras_to_tflite(kl, model_path)
-    donkey_lite = TfLiteCategorical(lite_filename, kl, testing=True)
-
-    #Reload Keras model.
-    #kl.load(args.model)
+        #Load TFLite model.
+        donkey_lite = TfLiteCategorical(lite_model, kl, testing=True)
 
     #V.add(kl, inputs=['cam/image_array'],
     V.add(donkey_lite, inputs=['cam/image_array'],
@@ -179,20 +177,36 @@ def train(cfg, tub_names, model_name):
 
 
 
+def convert(keras_model_path):
+    keras_backend.clear_session()
+    keras_backend.set_learning_phase(0)
+
+    #Run the pilot if the mode is not user.
+    kl = KerasCategorical()
+    kl.load(keras_model_path)
+
+    #Convert TFLite model.
+    lite_filename = convert_keras_to_tflite(kl, keras_model_path)
+    print("Converted model located at:\n{}".format(lite_filename))
+
 
 
 if __name__ == '__main__':
     args = docopt(__doc__)
     cfg = dk.load_config()
-    
+
     if args['drive']:
-        drive(cfg, model_path = args['--model'], use_joystick=args['--js'])
+        drive(cfg, model_path = args['--model'],
+              lite_model_path = args['--lite_model'], use_joystick=args['--js'])
 
     elif args['train']:
         tub = args['--tub']
         model = args['--model']
         cache = not args['--no_cache']
         train(cfg, tub, model)
+
+    elif args['convert']:
+        convert(keras_model_path=args['--keras_model'])
 
 
 

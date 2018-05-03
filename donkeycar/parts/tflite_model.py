@@ -11,7 +11,7 @@ import donkeycar as dk
 
 import tensorflow as tf
 from tensorflow.python.framework import graph_util
-from keras import backend as keras_backend
+from tensorflow.python.keras import backend as keras_backend
 
 
 class TfLiteModel(object):
@@ -81,9 +81,10 @@ def convert_keras_to_tflite(keras_model, model_name):
 
   # Load TF GraphDef.
   sess = keras_backend.get_session()
+
   graph_def = sess.graph.as_graph_def()
   frozen_graph = graph_util.convert_variables_to_constants(
-      sess, graph_def, output_tensor_names)
+     sess, graph_def, output_tensor_names)
 
   # Convert to .pb.
   output_directory = "."

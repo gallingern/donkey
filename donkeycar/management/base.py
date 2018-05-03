@@ -9,7 +9,7 @@ import donkeycar as dk
 from donkeycar.parts.datastore import Tub
 from .tub import TubManager
 
-from keras import backend as keras_backend
+from tensorflow.python.keras import backend as keras_backend
 from donkeycar.parts.tflite_model import TfLiteCategorical, convert_keras_to_tflite
 
 
@@ -254,6 +254,7 @@ class Sim(BaseCommand):
         if cfg is None:
             return
 
+        keras_backend.clear_session()
         keras_backend.set_learning_phase(0)
         #TODO: this logic should be in a pilot or modle handler part.
         if args.type == "categorical":
