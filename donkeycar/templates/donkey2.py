@@ -5,7 +5,7 @@ Scripts to drive a donkey 2 car and train a model for it.
 Usage:
     manage.py (drive) [--model=<keras model>] [--lite_model=<tflite model>] [--js]
     manage.py (train) [--tub=<tub1,tub2,..tubn>]  (--model=<model>) [--no_cache]
-    manage.py (convert) [--keras_model=<keras model>]
+    manage.py (convert) --keras_model=<model>
 
 Options:
     -h --help        Show this screen.
