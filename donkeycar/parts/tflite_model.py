@@ -10,13 +10,14 @@ import numpy as np
 import donkeycar as dk
 
 import tensorflow as tf
-from tflite_runtime import Interpreter
 from tensorflow.python.framework import graph_util
 
 
 class TfLiteModel(object):
 
   def __init__(self, model):
+    from tflite_runtime import Interpreter
+
     # Initialize interpreter.
     self._interpreter = Interpreter(model_path=model)
     self._interpreter.allocate_tensors()
