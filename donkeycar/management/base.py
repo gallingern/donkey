@@ -239,13 +239,32 @@ class Sim(BaseCommand):
         parsed_args = parser.parse_args(args)
         return parsed_args, parser
 
+    def load_model(self, model_path, model_type):
+        from donkeycar.parts.keras import KerasCategorical, KerasLinear
+
+        if model_path.endswith(".tflite"):
+            if model_type != "categorical":
+                raise RuntimeError(
+                    "Unexpected TFLite model type: {}".format(model_type))
+            model = TfLiteCategorical(model_path)
+        else:
+            #TODO: this logic should be in a pilot or modle handler part.
+            if model_type == "categorical":
+                model = KerasCategorical()
+            elif model_type == "linear":
+                model = KerasLinear(num_outputs=2)
+            else:
+                raise RuntimeError(
+                    "Unexpected keras model type: {}".format(model_type))
+            model.load(model_path)
+        return model
+
     def run(self, args):
         '''
         Start a websocket SocketIO server to talk to a donkey simulator
         '''
         import socketio
         from donkeycar.parts.simulation import SteeringServer
-        from donkeycar.parts.keras import KerasCategorical, KerasLinear
 
         args, parser = self.parse_args(args)
 
@@ -254,29 +273,11 @@ class Sim(BaseCommand):
         if cfg is None:
             return
 
-        keras_backend.clear_session()
-        keras_backend.set_learning_phase(0)
-        #TODO: this logic should be in a pilot or modle handler part.
-        if args.type == "categorical":
-            kl = KerasCategorical()
-        elif args.type == "linear":
-            kl = KerasLinear(num_outputs=2)
-        else:
-            print("didn't recognice type:", args.type)
-            return
+        #loads model
+        model = self.load_model(args.model, args.type)
 
         #can provide an optional image filter part
         img_stack = None
-
-        #load keras model
-        kl.load(args.model)
-
-        #load tflite model
-        lite_filename = convert_keras_to_tflite(kl, args.model)
-        donkey_lite = TfLiteCategorical(lite_filename, kl, testing=True)
-
-        #reload keras model
-        kl.load(args.model)
 
         #start socket server framework
         sio = socketio.Server()
@@ -284,8 +285,7 @@ class Sim(BaseCommand):
         top_speed = float(args.top_speed)
 
         #start sim server handler
-        # ss = SteeringServer(sio, donkey_car_model=kl, top_speed=top_speed, image_part=img_stack)
-        ss = SteeringServer(sio, donkey_car_model=donkey_lite,
+        ss = SteeringServer(sio, donkey_car_model=model,
                            top_speed=top_speed, image_part=img_stack)
 
         #register events and pass to server handlers

@@ -16,13 +16,7 @@ from tensorflow.python.framework import graph_util
 
 class TfLiteModel(object):
 
-  def __init__(self, model, keras_model, testing=False):
-    # Store keras model for testing.
-    self._keras_model = keras_model
-
-    # Boolean testing flag.
-    self._testing = testing
-
+  def __init__(self, model):
     # Initialize interpreter.
     self._interpreter = Interpreter(model_path=model)
     self._interpreter.allocate_tensors()
@@ -32,8 +26,8 @@ class TfLiteModel(object):
 # models.
 class TfLiteCategorical(TfLiteModel):
 
-  def __init__(self, model, keras_model, testing=False):
-    super(TfLiteCategorical, self).__init__(model, keras_model, testing)
+  def __init__(self, model):
+    super(TfLiteCategorical, self).__init__(model)
 
     # Create references to tensors.
     self.image_input_tensor = self._interpreter.get_input_details()[0]['index']
@@ -48,11 +42,6 @@ class TfLiteCategorical(TfLiteModel):
             "Unexpected extra output in model %r" % tensor_details['name'])
 
   def run(self, image_array):
-    # Gets keras values for testing.
-    k_steering, k_throttle = None, None
-    if self._testing:
-      k_steering, k_throttle = self._keras_model.run(image_array)
-
     # Gets tflite values.
     image_array = image_array.astype(np.float32)[None]
     self._interpreter.set_tensor(self.image_input_tensor, image_array)
@@ -62,16 +51,6 @@ class TfLiteCategorical(TfLiteModel):
     throttle = self._interpreter.get_tensor(self.throttle_tensor)
     angle_unbinned = dk.utils.linear_unbin(angle)
 
-    # Compares tflite and keras results.
-    if self._testing:
-      if k_steering != angle_unbinned or k_throttle != throttle[0][0]:
-        print("steering: {} vs {}".format(k_steering, angle_unbinned))
-        print("throttle: {} vs {}".format(k_throttle, throttle[0][0]))
-      else:
-        print("CORRECT!")
-    else:
-      print("steer: {} throttle: {}".format(angle_unbinned, throttle[0][0]))
-
     return angle_unbinned, throttle[0][0]
 
 
@@ -79,6 +58,8 @@ class TfLiteCategorical(TfLiteModel):
 # Converts the model to a TFLite flatbuffer. Returns the filename of the file
 # containing the TFLite flatbuffer.
 def convert_keras_to_tflite(keras_model, model_name):
+  from tensorflow.python.keras import backend as keras_backend
+
   output_tensors = keras_model.model.outputs
   output_tensor_names = [tensor.name.split(":")[0] for tensor in output_tensors]
 
@@ -102,7 +83,11 @@ def convert_keras_to_tflite(keras_model, model_name):
 
   # Convert to .tflite.
   input_tensor = keras_model.model.inputs[0]
-  input_tensor.get_shape = lambda : [1,120,160,3]
+  if input_tensor.shape[0].value is None:
+    width = int(input_tensor.shape[1].value)
+    height = int(input_tensor.shape[2].value)
+    depth = int(input_tensor.shape[3].value)
+    input_tensor.get_shape = lambda : [1, width, height, depth]
   filename = "{}.tflite".format(model_name)
   tflite_model = tf.contrib.lite.toco_convert(
       frozen_graph, [input_tensor], output_tensors)

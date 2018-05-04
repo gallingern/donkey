@@ -3,7 +3,7 @@
 Scripts to drive a donkey 2 car and train a model for it. 
 
 Usage:
-    manage.py (drive) [--model=<keras model>] [--lite_model=<tflite model>] [--js]
+    manage.py (drive) [--model=<keras or tflite model>] [--js]
     manage.py (train) [--tub=<tub1,tub2,..tubn>]  (--model=<model>) [--no_cache]
     manage.py (convert) --keras_model=<model>
 
@@ -31,7 +31,7 @@ from donkeycar.parts.tflite_model import TfLiteCategorical, convert_keras_to_tfl
 from tensorflow.python.keras import backend as keras_backend
 
 
-def drive(cfg, model_path=None, lite_model_path=None, use_joystick=False):
+def drive(cfg, model_path=None, use_joystick=False):
     """
     Construct a working robotic vehicle from many parts.
     Each part runs as a job in the Vehicle loop, calling either
@@ -75,17 +75,16 @@ def drive(cfg, model_path=None, lite_model_path=None, use_joystick=False):
     pilot_condition_part = Lambda(pilot_condition)
     V.add(pilot_condition_part, inputs=['user/mode'], outputs=['run_pilot'])
     
-    #Load Keras model.
-    kl = KerasCategorical()
-    donkey_lite = None
+    # Load either tflite or keras model.
+    model = None
     if model_path:
-        kl.load(model_path)
+        if model_path.endswith(".tflite"):
+            model = TfLiteCategorical(model_path)
+        else:
+            model = KerasCategorical()
+            model.load(model_path)
 
-        #Load TFLite model.
-        donkey_lite = TfLiteCategorical(lite_model_path, kl, testing=True)
-
-    #V.add(kl, inputs=['cam/image_array'],
-    V.add(donkey_lite, inputs=['cam/image_array'],
+    V.add(model, inputs=['cam/image_array'],
           outputs=['pilot/angle', 'pilot/throttle'],
           run_condition='run_pilot')
     
@@ -175,6 +174,9 @@ def train(cfg, tub_names, model_name):
              steps=steps_per_epoch,
              train_split=cfg.TRAIN_TEST_SPLIT)
 
+    # Convert to TFLite model.
+    convert(model_path)
+
 
 
 def convert(keras_model_path):
@@ -196,8 +198,7 @@ if __name__ == '__main__':
     cfg = dk.load_config()
 
     if args['drive']:
-        drive(cfg, model_path = args['--model'],
-              lite_model_path = args['--lite_model'], use_joystick=args['--js'])
+        drive(cfg, model_path = args['--model'], use_joystick=args['--js'])
 
     elif args['train']:
         tub = args['--tub']
