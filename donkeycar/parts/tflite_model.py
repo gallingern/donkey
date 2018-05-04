@@ -10,8 +10,8 @@ import numpy as np
 import donkeycar as dk
 
 import tensorflow as tf
+from tflite_runtime import Interpreter
 from tensorflow.python.framework import graph_util
-from tensorflow.python.keras import backend as keras_backend
 
 
 class TfLiteModel(object):
@@ -24,7 +24,7 @@ class TfLiteModel(object):
     self._testing = testing
 
     # Initialize interpreter.
-    self._interpreter = tf.contrib.lite.Interpreter(model_path=model)
+    self._interpreter = Interpreter(model_path=model)
     self._interpreter.allocate_tensors()
 
 
@@ -39,10 +39,13 @@ class TfLiteCategorical(TfLiteModel):
     self.image_input_tensor = self._interpreter.get_input_details()[0]['index']
 
     for tensor_details in self._interpreter.get_output_details():
-      if 'angle_out_1' in tensor_details['name']:
+      if 'angle_out' in tensor_details['name']:
         self.angle_tensor = tensor_details['index']
-      else:
+      elif 'throttle_out' in tensor_details['name']:
         self.throttle_tensor = tensor_details['index']
+      else:
+        raise RuntimeError(
+            "Unexpected extra output in model %r" % tensor_details['name'])
 
   def run(self, image_array):
     # Gets keras values for testing.
